@@ -51,6 +51,9 @@ spec:
       labels:
         app: mysql
     spec:
+      securityContext:
+        runAsUser: 999 # run as mysql user
+        runAsGroup: 999    
       containers:
         - image: mariadb:10.5.8
           name: mysql
@@ -63,6 +66,8 @@ spec:
           volumeMounts:
             - name: mysql-persistent-storage
               mountPath: /var/lib/mysql
+          securityContext:
+            allowPrivilegeEscalation: false              
       volumes:
         - name: mysql-persistent-storage
           persistentVolumeClaim:

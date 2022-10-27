@@ -8,3 +8,5 @@ EXPOSE 3000
 CMD ["npm", "run", "dev"]
 
 ADD . /opt/backend
+
+USER node

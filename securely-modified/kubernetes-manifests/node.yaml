@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: node
-          image: node-app:v1
+          image: node-app-secure:v1
           env:
           - name: DB_USER
             value: root 
@@ -26,6 +26,8 @@ spec:
             value: mysql                                            
           ports:
             - containerPort: 3000
+          securityContext:
+            allowPrivilegeEscalation: false               
 ---
 apiVersion: v1
 kind: Service

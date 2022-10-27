@@ -1,44 +1,16 @@
 # Kubernetes Security Repo with a Basic NodeJS and MySQL Example
 
-This repo has two examples of creating the same simple NodeJS / MySQL application running on Kubernetes.  The first in the insecure-original folder has no modifications and has various security flaws.  The second in the securely-modified folder has modications from the original to make it more secure and inline with best practices. 
+This repo has two examples of creating the same simple NodeJS / MySQL application running on Kubernetes.  The first in the insecure-original folder has no modifications and has various security flaws.  The second in the securely-modified folder has modications from the original to make it more secure and inline with best practices.   For details on how to build and deploy either check the README in the respective folders.
 
-## Pre-requisites
+## List of Security Modifications
 
-- Have docker installed and running (or via colima if using a Mac)
-- Install minikube as a local kubernetes platform to test on.
-- start minikube and run the following to install nginx ingress and ensure that the docker images you build will be accessed by minikube
+Below is a list of the security modifications we have made in the securely-modified folder and the reasons why.
 
-```
-minikube addons enable ingress
-eval $(minikube -p minikube docker-env)
-```
-
-## Build and Deploy the Insecure-Original Application
-
-Run the following:
-
-```
-cd insecure-original/node-app
-docker build . -t node-app:v1
-kubectl apply -f ../kubernetes-manifests/mysql.yaml
-kubectl apply -f ../kubernetes-manifests/node.yaml
-kubectl apply -f ../kubernetes-manifests/ingress.yaml
-```
-
-To access the application you have two options, via the service which will provide a local URL you enter into the browser to see the application:
-
-```
-minikube service node --url
-```
-
-Or via the ingress you will need to edit your /etc/hosts file first and add in the following (this is needed on the Mac, unsure for other platforms) 
-
-```
-127.0.0.1 minikube.local
-```
-
-Thenon the terminal run the following and then access minikube.local in the browser
-
-```
-minikube tunnel
-```
+1. Never run containers as root or privileged mode
+Why: 
+if your container gets compromised then running as root or priviliged mode (removes most of the isolation provided by the container) makes it fairly easy for the hacker to break out of the container and gain full access to the cluster, any kubernetes secrets and possibly your data.  Once the have access to run commands on the host they could for example write a key to /root/.ssh/authorized_keys on the host to gain remote access or worse.
+What's Changed: 
+- In securely-modified/node-app/Dockerfile ensure the last line defines the container to run as the node user 
+- In securely-modified/kubernetes-manifests/mysql.yaml in lines 55-56 set the security context to run the container as the mysql user
+- In securely-modified/kubernetes-manifests/node.yaml in lines 29-30 set allowPrivilegeEscalation to false
+- In securely-modified/kubernetes-manifests/mysql.yaml in lines 69-70 set allowPrivilegeEscalation to false
