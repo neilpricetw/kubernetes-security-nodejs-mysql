@@ -17,15 +17,21 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 16.x
-      - run: npm ci
-      - run: npm run build --if-present
-      - run: npm test            
+      - name: Run npm clean install
+        run: npm ci
+        working-directory: ./securely-modified/node-app
+      - name: Run npm clean install
+        run: npm run build --if-present
+        working-directory: ./securely-modified/node-app
+      - name: Run npm clean install
+        run: npm test
+        working-directory: ./securely-modified/node-app           
 
       - name: Run Trivy vulnerability scanner against code
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
-          scan-ref: './insecure-original/node-app'
+          scan-ref: './securely-modified/node-app'
           format: 'table'
           exit-code: '0'
           ignore-unfixed: true
