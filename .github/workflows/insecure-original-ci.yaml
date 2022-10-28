@@ -16,6 +16,11 @@ jobs:
       - name: Build an image from Dockerfile
         run: docker build ./insecure-original/node-app -t node-app-insecure:v1         
 
+      - name: Troubleshooting
+        run: |
+          pwd
+          ls -la
+
       - name: Run Trivy vulnerability scanner against code
         uses: aquasecurity/trivy-action@master
         with:
