@@ -24,6 +24,10 @@ jobs:
           tags: |
             node-app-secure:v1 
 
+      - name: Get docker images
+        run: |
+          docker images
+
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
