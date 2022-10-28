@@ -5,7 +5,7 @@ WORKDIR /opt/backend
 RUN npm install
 ADD . /opt/backend
 
-FROM gcr.io/distroless/nodejs
+FROM gcr.io/distroless/nodejs:debug
 COPY --from=build-env /opt/backend /app
 WORKDIR /app
 EXPOSE 3000

@@ -51,14 +51,14 @@ spec:
       labels:
         app: mysql
     spec:
-      securityContext:
-        runAsUser: 999 # run as mysql user
-        runAsGroup: 999    
+      #securityContext:
+      #  runAsUser: 999 # run as mysql user
+      #  runAsGroup: 999    
       containers:
-        - image: mariadb:10.5.8
+        - image: rapidfort/mariadb:latest
           name: mysql
-          env:
-            - name: MYSQL_ROOT_PASSWORD
+          env:          
+            - name: MARIADB_ROOT_PASSWORD
               value: password
           ports:
             - containerPort: 3306

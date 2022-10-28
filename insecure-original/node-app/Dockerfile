@@ -1,4 +1,4 @@
-FROM node:8.12.0-alpine
+FROM node:16.5.0-alpine
 
 RUN mkdir -p /opt/backend
 ADD package.json /opt/backend
