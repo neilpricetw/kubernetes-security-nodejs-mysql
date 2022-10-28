@@ -26,7 +26,7 @@ jobs:
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'      
 
-      - name: Install trivy
+      - name: Install Trivy
         run: |
           sudo apt-get install wget apt-transport-https gnupg lsb-release
           wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
@@ -34,6 +34,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install trivy              
 
-      - name: Run trivy against image
+      - name: Run Trivy against image
         run: |
           trivy image node-app-insecure:v1   
