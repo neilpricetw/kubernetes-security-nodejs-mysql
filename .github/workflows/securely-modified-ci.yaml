@@ -21,8 +21,8 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: ./securely-modified/node-app
-          tags: |
-            node-app-secure:v1 
+          tags: node-app-secure:v1 
+          push: false
 
       - name: Get docker images
         run: |
