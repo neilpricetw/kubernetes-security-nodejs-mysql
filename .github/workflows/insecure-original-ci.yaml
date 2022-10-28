@@ -17,9 +17,6 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 16.x
-      - name: test
-        run: ls -la
-        working-directory: ./insecure-original/node-app
       - name: Run npm clean install
         run: npm ci
         working-directory: ./insecure-original/node-app
