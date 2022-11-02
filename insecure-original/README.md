@@ -13,6 +13,8 @@ minikube addons enable ingress
 eval $(minikube -p minikube docker-env)
 ```
 
+Note: two possible alternatives to minikube are [Kind](https://kind.sigs.k8s.io/) which is still run locally or [killercoda](https://killercoda.com/playgrounds/scenario/kubernetes) which provides an online kubernetes playground.
+
 ## Build and Deploy the Insecure-Original Application
 
 Run the following:

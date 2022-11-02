@@ -1,0 +1,26 @@
+### Pod Security Standards 
+###
+### To apply at a cluster level PodSecurity needs to be enabled
+### To enable and apply to minikube: minikube start --feature-gates=PodSecurity=true
+### Then you can apply the standards also at start up using this flag --admission-control-config-file and a file similar to below
+### For more info see https://kubernetes.io/docs/tasks/configure-pod-container/enforce-standards-admission-controller/#configure-the-admission-controller
+### Note I was unable to apply the flag --admission-control-config-file to minikube but I presume it would work for normal clusters
+###
+apiVersion: apiserver.config.k8s.io/v1
+kind: AdmissionConfiguration
+plugins:
+- name: DefaultPodSecurity
+  configuration:
+    apiVersion: pod-security.admission.config.k8s.io/v1alpha1
+    kind: PodSecurityConfiguration
+    defaults:
+      enforce: "baseline"
+      enforce-version: "latest"
+      audit: "restricted"
+      audit-version: "latest"
+      warn: "restricted"
+      warn-version: "latest"
+    exemptions:
+      usernames: []
+      runtimeClassNames: []
+      namespaces: [kube-system]
