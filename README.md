@@ -18,7 +18,7 @@ You can see in the [GitHub Action Code](https://github.com/neilpricetw/kubernete
 
 ### 2. Never run containers as root or privileged mode
 __Why__: 
-If your container gets compromised then running as root or priviliged mode (removes most of the isolation provided by the container) making it fairly easy for the hacker to break out of the container and gain full access to the host node, potentially the cluster, any kubernetes secrets and possibly all your data.  Once they have access to run commands on the host they could for example query the cluster API to create their own pods or write a key to /root/.ssh/authorized_keys on the host to gain remote access or worse.  
+If your container gets compromised then running as root or priviliged mode (removes most of the isolation provided by the container) making it fairly easy for the hacker to break out of the container and gain full access to the host node, potentially the cluster, any kubernetes secrets and possibly all your data.  Once they have access to run commands on the host they could for example query the cluster API to create their own pods or write a key to /root/.ssh/authorized_keys on the host to gain remote access or worse.  In security tip 7 further down we'll show you how to ensure privileged mode is prohibited through the security context. 
 __Preventative Steps__:
 In securely-modified/node-app/Dockerfile I've added the following as the last line which defines the user that the container should run as.
 ```
@@ -118,29 +118,91 @@ Running the following will generate json output and a score for each.  The insec
 docker run -i kubesec/kubesec:512c5e0 scan /dev/stdin < insecure-original/kubernetes-manifests/mysql.yaml
 docker run -i kubesec/kubesec:512c5e0 scan /dev/stdin < securely-modified/kubernetes-manifests/mysql.yaml
 ```
+Here's some example output:
+```
+[
+  {
+    "object": "Deployment/mysql.default",
+    "valid": true,
+    "message": "Passed with a score of 7 points",
+    "score": 7,
+    "scoring": {
+      "advise": [
+        {
+          "selector": ".spec .serviceAccountName",
+          "reason": "Service accounts restrict Kubernetes API access and should be configured with least privilege"
+        },
+        {
+          "selector": "containers[] .securityContext .readOnlyRootFilesystem == true",
+          "reason": "An immutable root filesystem can prevent malicious binaries being added to PATH and increase attack cost"
+        },
+        {
+          "selector": ".metadata .annotations .\"container.seccomp.security.alpha.kubernetes.io/pod\"",
+          "reason": "Seccomp profiles set minimum privilege and secure against unknown threats"
+        },
+        {
+          "selector": ".metadata .annotations .\"container.apparmor.security.beta.kubernetes.io/nginx\"",
+          "reason": "Well defined AppArmor policies may provide greater protection from unknown threats. WARNING: NOT PRODUCTION READY"
+        },
+        {
+          "selector": "containers[] .securityContext .runAsUser -gt 10000",
+          "reason": "Run as a high-UID user to avoid conflicts with the host's user table"
+        }
+      ]
+    }
+  }
+]
+```
 
 
 ### 7. Define security contexts and seccomp profiles for your containers
 __Why__: 
-So there are a whole series of best practice security tweaks you can make here that will reduce your attack surface area.
-
-
-As per https://media.defense.gov/2022/Aug/29/2003066362/-1/-1/0/CTR_KUBERNETES_HARDENING_GUIDANCE_1.2_20220829.PDF
-See book examples and add below  
-
-
-Check if your pods are sharing the host’s IPC or network namespace. Sharing namespaces for pod and host interprocess communication may lead to opening access to shared information. Pods should not be allowed access to the host namespaces. 
-
-And sharing pod and host network namespaces enables network access to the host network from the pod, which breaks network isolation. That’s why you better set the hostNetwork parameter to false in PodSecurityPolicy.
-
-seccomp (see https://kubernetes.io/docs/tutorials/security/seccomp/) - Note: It is not possible to apply a seccomp profile to a container running with privileged: true set in the container's securityContext. Privileged containers always run as Unconfined. RuntimeDefault as the default seccomp profile: The default profiles aim to provide a strong set of security defaults while preserving the functionality of the workload.  
+As you've seen from the kubesec output it's best practice to apply multiple security context settings and a seccomp profile which all go towards limiting a hacker's options if the container is compromised and will generally reduce the attack surface area.  Many of these recommendations and more can be found in the [NSA Kubernetes Hardening Guide](https://media.defense.gov/2022/Aug/29/2003066362/-1/-1/0/CTR_KUBERNETES_HARDENING_GUIDANCE_1.2_20220829.PDF) which includes descriptions for each setting and why you may wish to apply them.  [Seccomp](https://kubernetes.io/docs/tutorials/security/seccomp/) profiles can only be applied to containers that are not running in privileged mode.  One option is to set seccomp profile to RuntimeDefault which provides a strong set of security defaults while preserving the functionality of the workload.
 __Preventative Steps__:
-In securely-modified/kubernetes-manifests/node.yaml in lines 29-30 set allowPrivilegeEscalation to false
-In securely-modified/kubernetes-manifests/mysql.yaml in lines 69-70 set allowPrivilegeEscalation to false
-use kubesec, etc
 
 
-### 8. Apply Pod Security Standards to your cluster or namespace
+
+### 8. Define AppArmor profiles for your containers
+__Why__: 
+There is some overlap with security context and specifically Linux capabilities but I feel that the AppArmor also offers you greater flexibility to get granular on restricting permissions inside a container.  Associating an AppArmor well designed profile with your container can definitely reduce the risk if your container gets compromised by a hacker.
+__Preventative Steps__:
+For AppArmor you need to ensure it's enabled on the cluster (you can check /sys/module/apparmor/parameters/enabled on each node to confirm this).  Then you can create a custom profile file (in this example called 'deny-write') and save it on all the Kubernetes nodes in directory /etc/apparmor.d.  This is just an example of the deny-write file below which prevents writing contents to the filesystem inside the container (which is easy to test).
+```
+#include <tunables/global>
+profile deny-write flags=(attach_disconnected) {
+  #include <abstractions/base>
+file,
+# Deny all file writes.
+  deny /** w,
+}
+```
+Once you've saved it on each node you can run the following which will add it into the AppArmor profiles.
+```
+/sbin/apparmor_parser --replace --write-cache /etc/apparmor.d/deny-write
+```
+You can verify it is in the AppArmor profiles list by running the following command.  You should see your profile in the output:
+```
+aa-status
+```
+Now you can add it into your container manifest file like below (in securely-modified/kubernetes-manifests/mysql.yaml and node.yaml I've replaced localhost/deny-write with runtime/default which is simply confirming AppArmor is enabled but is not actually applying any security profile because I couldn't get it working in minikube but it works on standard kubernetes clusters):
+```
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mysql
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/mysql: localhost/deny-write
+```
+This may even prevent the container from running or if it does run you can test it by trying to write a file to the filesystem and you should get permission denied.  A good example of a more complex custom AppArmor profile which is commonly used can be found [here](https://github.com/containers/common/blob/main/pkg/apparmor/apparmor_linux_template.go).
+
+
+### 9. Apply Pod Security Standards to your cluster or namespace
 __Why__: 
 Pod Security Standards replaces pod security policies (PSPs) which are now deprecated.  You can apply them at the cluster level which is usually a flag that needs to be enabled when the cluster service starts (see pod_security_adminission_controller.yaml in this code base for more info).  For more flexibility it's easier to apply it at the namespace level (see namespace.yaml).  This also helps to reduce the liklihood of using the default namespace which should be avoided and isolate workloads and services into their own namespaces which is a security best practice.  Once the Pod Security Standards have been applied either to your cluster or namespace then it will either audit, warn or enforce security standards which should help you make your platform more secure.  
 __Preventative Steps__:
@@ -157,7 +219,7 @@ metadata:
 ```
 
 
-### 9. Apply container resource limits to CPU and Memory
+### 10. Apply container resource limits to CPU and Memory
 __Why__: 
 The main security reason to apply resource requests and limits to the containers is to limit the risks to your cluster if any of the containers were compromised.  In theory the hacker is resourced limited as opposed to consuming resources across your whole cluster and possibly bringing everything offline.  
 __Preventative Steps__:
@@ -173,26 +235,25 @@ In securely-modified/kubernetes-manifests/node.yaml and securely-modified/kubern
 ```
 
 
-### 10. Use the container image sha256 hash to reference it 
+### 11. Use the container image sha256 hash to reference it 
 __Why__: 
 Sunburst / SolarWinds hack supply chain!
 __Preventative Steps__:
 
 
 
-### 11. Implement granular RBAC (least privilege)
+### 12. Implement granular RBAC (least privilege)
 __Why__: 
 audit2rbac
 __Preventative Steps__:
 
 
 
-### 12. Run hadolint and conftest to ensure a Dockerfile confirms best practices
+### 13. Run hadolint and conftest to ensure a Dockerfile confirms best practices
 __Why__: 
 
 __Preventative Steps__:
 
 
-SELinux / AppArmour as part of SecurityContext?
 Open Policy Agent?
 kubehunter and ccat and dockerscan

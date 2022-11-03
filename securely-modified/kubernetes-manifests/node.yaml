@@ -11,6 +11,8 @@ spec:
     metadata:
       labels:
         app: node
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/node: runtime/default # replace runtime/default with your custom profile, e.g. localhost/deny-write etc.        
     spec:
       hostPID: false # Controls whether containers can share host process namespace
       hostIPC: false # Controls whether containers can share host process namespace
