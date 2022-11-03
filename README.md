@@ -9,7 +9,7 @@ Below is a list of the security modifications I've made in the securely-modified
 
 ### 1. Always scan and patch your application and image
 __Why__:
-This is the minimal viable security which should be implemented.  Hackers have plenty of online documentation and specialist tools that can exploit known vulnerabilities.  If you don't patch your application and images then they will remain in a known vulnerable state which could have been avoided. Low hanging fruit for a seasoned hacker! 
+This is the minimal viable security which should be implemented.  Hackers have plenty of online documentation and specialist tools that can exploit known vulnerabilities.  If you don't patch your application and images then they will remain in a known vulnerable state which could have been avoided. Low hanging fruit for a seasoned hacker!  
 __Preventative Steps__:
 You can use __dependabot__ which is built into Github or __[Trivy](https://github.com/aquasecurity/trivy)__ to scan for package dependency vulnerabilities.  Interestingly when comparing the two Trivy picked up more vulnerabilities than Dependabot (but Dependabot picked up one that Trivy didn't detect).  Trivy can also scan container images for vulnerabilities and can be run on the command line or in a CI/CD pipeline and if desired stop a build if high or critical CVEs are detected.
 You can see in the [GitHub Action Code](https://github.com/neilpricetw/kubernetes-security-nodejs-mysql/blob/main/.github/workflows/securely-modified-ci.yaml) I am running Trivy against both the application code and then also against the image as it will pick up different vulnerabilities.
@@ -56,7 +56,7 @@ CMD ["index.js"]
 
 ### 4. Ideally remove bash shell from container and/or use hardened images (applicable to mariadb/mysql in this example)
 __Why__: 
-Similar to the 'Why' for distroless, this is about limiting the hacker's options if the container gets compromised.  The bash shell can be used to create a reverse shell for the hacker to gain access remotely if it's available.
+Similar to the 'Why' for distroless, this is about limiting the hacker's options if the container gets compromised.  The bash shell can be used to create a reverse shell for the hacker to gain access remotely if it's available.  
 __Preventative Steps__:
 In securely-modified/kubernetes-manifests/mysql.yaml I've commented out the security context relating to the user and updated the image to use a hardened image.  The user that the container runs as is not root but it's not clear who it is but I'm certain it doesn't have root permissions.  The hardened image massively reduces the amount of vulnerabilities, see https://frontrow.rapidfort.com/app/community/imageinfo/docker.io%2Fbitnami%2Fmariadb/vulns/original for the differences between a normal and hardened mariadb image.  I've left the hardened image commented out as the image was not compatible with the Mac M1 Chipset (I've confirmed the code works on [killercoda](https://killercoda.com/playgrounds/scenario/kubernetes)).
 ```
@@ -75,13 +75,43 @@ In securely-modified/kubernetes-manifests/mysql.yaml I've commented out the secu
 
 ### 5. Don't store secret data as container environment variables
 __Why__: 
-It's very common for containers to read environment variables for secret data perhaps to connect to a database.  If your container gets compromised then the environment variables are likely to be the first place they look so it makes sense to not store the data there and make it all to easy for the hacker.  Kubernetes provides secretRef and secretKeyRef options to add your secrets as environment variables but it is safer to store your secrets as files and have the values base64 encoded.  It's important to go to these extra lengths because you need to do the upmost to protect your data.
+It's very common for containers to read environment variables for secret data perhaps to connect to a database.  If your container gets compromised then the environment variables are likely to be the first place they look so it makes sense to not store secret data there making it easy for the hacker.  Kubernetes provides secretRef and secretKeyRef options to add your kubernetes secrets as environment variables but it is safer to store your secrets as files for the reason specified above.  It's important to go to these extra lengths because you need to do the upmost to protect your data.  
 __Preventative Steps__:
-
+In securely-modified/kubernetes-manifests/node.yaml I removed this...
+```
+          env:
+          - name: DB_USER
+            value: root 
+          - name: DB_PASSWORD 
+            value: password 
+          - name: DB_HOST
+            value: mysql 
+          - name: DB_NAME
+            value: mysql 
+```
+and adding this code below to securely-modified/kubernetes-manifests/node.yaml.
+```
+          volumeMounts:
+            - name: secrets-volume
+              mountPath: /etc/node-details
+      volumes:
+        - name: secrets-volume
+          secret:
+            secretName: node-secrets              
+```
+It references a new Kubernetes secret (see secrets.yaml) which needs to be applied to the cluster before the node.yaml is applied.  This secrets.yaml file should not have the actual values (secrets) hard coded in, there should be placeholders that get updated in the CI/CD pipeline as it which retrieves the secret data from a key safe or vault service and updates the values.  You will also need to change the application code to retrieve the data from the files and unencode it, see below in index.js:
+```
+const con = mysql.createConnection({
+  host: fs.readFileSync("/etc/node-details/host").toString(),
+  user: fs.readFileSync("/etc/node-details/user").toString(),
+  password: fs.readFileSync("/etc/node-details/pwd").toString(),
+  database: fs.readFileSync("/etc/node-details/name").toString()
+});
+```
 
 ### 6. Run kubesec against your manifest files
 __Why__: 
-Kubesec is a simple tool to validate the security of a kubernetes resources.  It returns a risk score for the resource, and advises on how to tighten the securityContext.  It's very east to use and can be built into a CI/CD pipeline is desired.
+Kubesec is a simple tool to validate the security of a kubernetes resources.  It returns a risk score for the resource, and advises on how to tighten the securityContext.  It's very east to use and can be built into a CI/CD pipeline is desired.  
 __Preventative Steps__:
 Running the following will generate json output and a score for each.  The insecure file scored 0 whereas the secure file should be higher once we've applied the best practices.
 ```
@@ -103,8 +133,7 @@ Check if your pods are sharing the host’s IPC or network namespace. Sharing na
 
 And sharing pod and host network namespaces enables network access to the host network from the pod, which breaks network isolation. That’s why you better set the hostNetwork parameter to false in PodSecurityPolicy.
 
-seccomp (see https://kubernetes.io/docs/tutorials/security/seccomp/) - Note: It is not possible to apply a seccomp profile to a container running with privileged: true set in the container's securityContext. Privileged containers always run as Unconfined. RuntimeDefault as the default seccomp profile: The default profiles aim to provide a strong set of security defaults while preserving the functionality of the workload.
-
+seccomp (see https://kubernetes.io/docs/tutorials/security/seccomp/) - Note: It is not possible to apply a seccomp profile to a container running with privileged: true set in the container's securityContext. Privileged containers always run as Unconfined. RuntimeDefault as the default seccomp profile: The default profiles aim to provide a strong set of security defaults while preserving the functionality of the workload.  
 __Preventative Steps__:
 In securely-modified/kubernetes-manifests/node.yaml in lines 29-30 set allowPrivilegeEscalation to false
 In securely-modified/kubernetes-manifests/mysql.yaml in lines 69-70 set allowPrivilegeEscalation to false
@@ -113,7 +142,7 @@ use kubesec, etc
 
 ### 8. Apply Pod Security Standards to your cluster or namespace
 __Why__: 
-Pod Security Standards replaces pod security policies (PSPs) which are now deprecated.  You can apply them at the cluster level which is usually a flag that needs to be enabled when the cluster service starts (see pod_security_adminission_controller.yaml in this code base for more info).  For more flexibility it's easier to apply it at the namespace level (see namespace.yaml).  This also helps to reduce the liklihood of using the default namespace which should be avoided and isolate workloads and services into their own namespaces which is a security best practice.  Once the Pod Security Standards have been applied either to your cluster or namespace then it will either audit, warn or enforce security standards which should help you make your platform more secure.
+Pod Security Standards replaces pod security policies (PSPs) which are now deprecated.  You can apply them at the cluster level which is usually a flag that needs to be enabled when the cluster service starts (see pod_security_adminission_controller.yaml in this code base for more info).  For more flexibility it's easier to apply it at the namespace level (see namespace.yaml).  This also helps to reduce the liklihood of using the default namespace which should be avoided and isolate workloads and services into their own namespaces which is a security best practice.  Once the Pod Security Standards have been applied either to your cluster or namespace then it will either audit, warn or enforce security standards which should help you make your platform more secure.  
 __Preventative Steps__:
 To apply at the namespace see securely-modified/kubernetes-manifests/namespace.yaml also shown below which can be applied using kubectl.
 ```
@@ -130,7 +159,7 @@ metadata:
 
 ### 9. Apply container resource limits to CPU and Memory
 __Why__: 
-The main security reason to apply resource requests and limits to the containers is to limit the risks to your cluster if any of the containers were compromised.  In theory the hacker is resourced limited as opposed to consuming resources across your whole cluster and possibly bringing everything offline. 
+The main security reason to apply resource requests and limits to the containers is to limit the risks to your cluster if any of the containers were compromised.  In theory the hacker is resourced limited as opposed to consuming resources across your whole cluster and possibly bringing everything offline.  
 __Preventative Steps__:
 In securely-modified/kubernetes-manifests/node.yaml and securely-modified/kubernetes-manifests/mysql.yaml you'll see resource requests and limits applied to the containers.
 ```

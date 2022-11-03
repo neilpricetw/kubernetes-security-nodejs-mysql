@@ -25,15 +25,9 @@ spec:
             limits:
               memory: "128Mi"
               cpu: "500m"          
-          env:
-          - name: DB_USER
-            value: root 
-          - name: DB_PASSWORD 
-            value: password 
-          - name: DB_HOST
-            value: mysql 
-          - name: DB_NAME
-            value: mysql             
+          volumeMounts:
+            - name: secrets-volume
+              mountPath: /etc/node-details
           ports:
             - containerPort: 3000
           securityContext:
@@ -45,7 +39,11 @@ spec:
             privileged: false # Controls whether pods can run privileged containers
             #runAsNonRoot: true # when running a distroless image and seccomp profile I've found that in this case I needed to disable it to get the container running
             readOnlyRootFilesystem: true # Requires the use of a read only root filesystem            
-            allowPrivilegeEscalation: false # Restricts escalation to root privileges                  
+            allowPrivilegeEscalation: false # Restricts escalation to root privileges    
+      volumes:
+        - name: secrets-volume
+          secret:
+            secretName: node-secrets                        
 ---
 apiVersion: v1
 kind: Service

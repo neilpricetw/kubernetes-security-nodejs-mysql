@@ -1,15 +1,16 @@
 const express = require("express");
 const mysql = require("mysql");
+const fs = require('fs');
 const app = express();
 const port = 3000;
 
 app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 
 const con = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
+  host: fs.readFileSync("/etc/node-details/host").toString(),
+  user: fs.readFileSync("/etc/node-details/user").toString(),
+  password: fs.readFileSync("/etc/node-details/pwd").toString(),
+  database: fs.readFileSync("/etc/node-details/name").toString()
 });
 
 con.connect(function(err) {
