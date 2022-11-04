@@ -61,7 +61,7 @@ spec:
         runAsGroup: 999
         fsGroup: 2000
       containers:
-        - image: mariadb:10.5.8 
+        - image: mariadb@sha256:8040983db146f729749081c6b216a19d52e0973134e2e34c0b4fd87f48bc15b0 # this is a specific version of mariadb:10.5.8 
           name: mysql
           resources:
             requests:
