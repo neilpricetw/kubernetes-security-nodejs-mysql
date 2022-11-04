@@ -157,9 +157,29 @@ Here's some example output:
 
 ### 7. Define security contexts and seccomp profiles for your containers
 __Why__: 
-As you've seen from the kubesec output it's best practice to apply multiple security context settings and a seccomp profile which all go towards limiting a hacker's options if the container is compromised and will generally reduce the attack surface area.  Many of these recommendations and more can be found in the [NSA Kubernetes Hardening Guide](https://media.defense.gov/2022/Aug/29/2003066362/-1/-1/0/CTR_KUBERNETES_HARDENING_GUIDANCE_1.2_20220829.PDF) which includes descriptions for each setting and why you may wish to apply them.  [Seccomp](https://kubernetes.io/docs/tutorials/security/seccomp/) profiles can only be applied to containers that are not running in privileged mode.  One option is to set seccomp profile to RuntimeDefault which provides a strong set of security defaults while preserving the functionality of the workload.
+As you've seen from the kubesec output it's best practice to apply multiple security context settings and a seccomp profile which all go towards limiting a hacker's options if the container gets compromised and will generally reduce the attack surface area.  Many of these recommendations and more can be found in the [NSA Kubernetes Hardening Guide](https://media.defense.gov/2022/Aug/29/2003066362/-1/-1/0/CTR_KUBERNETES_HARDENING_GUIDANCE_1.2_20220829.PDF) which includes descriptions for each setting and why you may wish to apply them.  [Seccomp](https://kubernetes.io/docs/tutorials/security/seccomp/) profiles can only be applied to containers that are not running in privileged mode.  One option is to set seccomp profile to RuntimeDefault which provides a strong set of security defaults while preserving the functionality of the workload.
 __Preventative Steps__:
-
+In the container deployments manifest files I've added these lines:
+```
+    spec:
+      hostPID: false # Controls whether containers can share host process namespace
+      hostIPC: false # Controls whether containers can share host process namespace
+      hostNetwork: false # Controls whether containers can use the host network 
+```
+and further down added a security context with a seccomp profile:
+```
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault # this seccomp profile provides a strong set of security defaults while preserving the functionality of the workload
+            capabilities: # You should always drop all capabilities and only add those that your application needs to operate
+              drop: # drop should always come before add
+                - ALL       
+            privileged: false # Controls whether pods can run privileged containers
+            #runAsNonRoot: true # when running a distroless image and seccomp profile I've found that in this case I needed to disable it to get the container running
+            readOnlyRootFilesystem: true # Requires the use of a read only root filesystem            
+            allowPrivilegeEscalation: false # Restricts escalation to root privileges  
+```
+Interestingly for the node one I had to comment out runAsNonRoot and for the mysql one I had to comment out readOnlyRootFilesystem.  You'll find there will be tweaks needed depending on the container requirements.  These aren't all the securityContext fields, you can see more [here](https://kubernetes.io/docs/concepts/security/pod-security-standards/).
 
 
 ### 8. Define AppArmor profiles for your containers

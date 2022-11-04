@@ -87,8 +87,8 @@ spec:
               mountPath: /var/lib/mysql
           securityContext:
             seccompProfile:
-              type: RuntimeDefault          
-            capabilities: # You should always drop all capabilities and only read those that your application needs to operate
+              type: RuntimeDefault # this seccomp profile provides a strong set of security defaults while preserving the functionality of the workload  
+            capabilities: # You should always drop all capabilities and only add those that your application needs to operate
               drop: # drop should always come before add
                 - ALL
             privileged: false # Controls whether pods can run privileged containers
