@@ -292,11 +292,184 @@ CMD ["index.js"]
 ```
 
 
-### 12. Implement granular RBAC (least privilege)
+### 12. Implement auditing and apply granular RBAC (least privilege)
 __Why__: 
-audit2rbac
-__Preventative Steps__:
+You may or may not be shocked to hear that auditing is not enabled out of the box.  This also includes managed Kubernetes clusters like EKS or AKS where you need to enable it.  Audit logs provide a comprehensive overview of everything happening in your cluster, allowing you to make informed decisions. It’s important to note that improperly configured audit logs can contain so much information that they’re impossible to use, so it’s important to make sure that your configuration gives you enough information to get the logs you need, but not so much that it’s overwhelming.  Some of the key information recorded in the audit logs are:
+- User Information and Originating IP
+- Information About Requests That Were Initiated and Executed
+- Response Status of the Actions Performed
+I've found these links useful in helping to understand and configure Kubernetes auditing([kubernetes.io - k8s auditing](https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/#advanced-audit), [signoz.io - k8s auditing](https://signoz.io/blog/kubernetes-audit-logs/) and [containiq.com - k8s auditing](https://www.containiq.com/post/kubernetes-audit-logs)).
 
+Once auditing is enabled on your cluster there is a useful tool called [audit2rbac](https://github.com/liggitt/audit2rbac) which takes a Kubernetes audit log and username or service account as input, and generates RBAC role and binding objects that cover all the API requests made by that user.  This allows you to refine the permissions of users and service accounts to become least privilege.
+
+__Preventative Steps__:
+To enable an audit policy on my minikube cluster I've created securely-modified/kubernetes-manifests/audit-policy.yaml, this cannot be applied via kubectl, it needs to be created on the primary node of the cluster (/etc/kubernetes/audit-policy.yaml).  On minikube you need to ssh in first:
+```
+minikube ssh
+```
+Once ssh'd in to the primary node create the file in /etc/kubernetes.  Then you need to create audit.log in the following directory as per the following commands. This is where Kubernetes will save your audit logs.
+```
+sudo mkdir /var/log/kubernetes/ && cd /var/log/kubernetes/
+sudo mkdir audit/ && sudo touch audit.log
+```
+Now you need to edit the kubernetes api server manifest by running the following:
+```
+sudo vi /etc/kubernetes/manifests/kube-apiserver.yaml
+```
+In this file add the following volume mounts:
+```
+volumeMounts:
+
+- mountPath: /etc/kubernetes/audit-policy.yaml
+     name: audit
+     readOnly: true
+- mountPath: /var/log/kubernetes/audit/audit.log
+     name: audit-log
+     readOnly: false
+```
+and the following volumes:
+```
+volumes:
+
+ - hostPath:
+      path: /etc/kubernetes/audit-policy.yaml
+      type: File
+   name: audit
+ - hostPath:
+      path: /var/log/kubernetes/audit/audit.log
+      type: FileOrCreate
+   name: audit-log
+```
+Lastly update the command section to enable auditing in your cluster and save the changes:
+```
+ --audit-policy-file=/etc/kubernetes/audit-policy.yaml
+ --audit-log-path=/var/log/kubernetes/audit/audit.log
+```
+To test it run any kubectl command and then ssh back into minikube and see if there's contents recorded in /var/log/kubernetes/audit/audit.log.
+
+To enable it in cloud services see [AWS](https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html), [GCP](https://cloud.google.com/kubernetes-engine/docs/how-to/audit-logging) and [Azure](https://learn.microsoft.com/en-gb/azure/aks/monitor-aks#configure-monitoring).
+
+Now you have access to the audit logs you can send them to a SIEM / monitoring platform and also choose to use audit2rbac which will help you to refine the permissions you assign your users and service accounts to least privilege.  I struggled to get audit2rbac to work on my Mac so I downloaded and ran it inside a container (not efficient but for my own peace of mind I wanted to see it working).  I copied the audit log into the container and downloaded the correct audit2rbac package then ran the following:
+```
+./audit2rbac -f audit.log --user system:kube-scheduler
+```
+Which returned the recommended least privilege permissions for that user which you can then choose to apply to your cluster:
+```
+root@168039c36b12:/# ./audit2rbac -f audit.log --user system:kube-scheduler
+Opening audit source...
+Loading events...
+Evaluating API calls...
+Generating roles...
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  annotations:
+    audit2rbac.liggitt.net/version: v0.9.0
+  labels:
+    audit2rbac.liggitt.net/generated: "true"
+    audit2rbac.liggitt.net/user: system-kube-scheduler
+  name: audit2rbac:system:kube-scheduler
+  namespace: kube-system
+rules:
+- apiGroups:
+  - ""
+  resourceNames:
+  - extension-apiserver-authentication
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  annotations:
+    audit2rbac.liggitt.net/version: v0.9.0
+  labels:
+    audit2rbac.liggitt.net/generated: "true"
+    audit2rbac.liggitt.net/user: system-kube-scheduler
+  name: audit2rbac:system:kube-scheduler
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  - nodes
+  - persistentvolumeclaims
+  - persistentvolumes
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - replicasets
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - csidrivers
+  - storageclasses
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  annotations:
+    audit2rbac.liggitt.net/version: v0.9.0
+  labels:
+    audit2rbac.liggitt.net/generated: "true"
+    audit2rbac.liggitt.net/user: system-kube-scheduler
+  name: audit2rbac:system:kube-scheduler
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: audit2rbac:system:kube-scheduler
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: system:kube-scheduler
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  annotations:
+    audit2rbac.liggitt.net/version: v0.9.0
+  labels:
+    audit2rbac.liggitt.net/generated: "true"
+    audit2rbac.liggitt.net/user: system-kube-scheduler
+  name: audit2rbac:system:kube-scheduler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: audit2rbac:system:kube-scheduler
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: system:kube-scheduler
+Complete!
+```
+Obviously I recommend focusing on refining permissions on the users and service accounts that you create.  I'm uncertain about the consequences of refining the permissions on system users and accounts but it could help make it more secure (thorough testing is definitely required).
 
 
 ### 13. Run hadolint and conftest to ensure a Dockerfile confirms best practices
@@ -307,3 +480,8 @@ __Preventative Steps__:
 
 Open Policy Agent?
 kubehunter and ccat and dockerscan
+
+
+
+SigNoz, an open source APM can monitor metrics, traces, and logs of your Kubernetes cluster. It is built to support OpenTelemetry natively, the open source standard for instrumenting cloud-native applications. 
+https://github.com/SigNoz/signoz
