@@ -1,11 +1,12 @@
-# Kubernetes Security Repo with a Basic NodeJS and MySQL Example
+# Kubernetes Security Best Practice Recommendations
 
-This repo has two examples of creating the same simple NodeJS / MySQL application running on Kubernetes.  The first in the insecure-original folder which has no modifications and has various security flaws.  The second in the securely-modified folder has modications from the original to make it more secure and inline with best practices.   For details on how to build and deploy either check out their READMEs ([insecure-original readme](https://github.com/neilpricetw/kubernetes-security-nodejs-mysql/blob/main/insecure-original/README.md), [securely-modified readme](https://github.com/neilpricetw/kubernetes-security-nodejs-mysql/blob/main/securely-modified/README.md)).
+This repo has two examples of creating the same simple NodeJS / MySQL application running on Kubernetes.  The first in the insecure-original folder has no modifications and does not follow best practices, it literally just deploys the application.  The second in the securely-modified folder has modications from the original to make it more secure and inline with best practices.
+
+Below goes into detail about each of the best practice modifications I've made explaining why it's good to implement them and how to implement them.
+
+For details on how to build and deploy either the insecure or secure solutions using minikube check out their READMEs ([insecure-original readme](https://github.com/neilpricetw/kubernetes-security-nodejs-mysql/blob/main/insecure-original/README.md), [securely-modified readme](https://github.com/neilpricetw/kubernetes-security-nodejs-mysql/blob/main/securely-modified/README.md)).
 
 ## List of Security Modifications
-
-Below is a list of the security modifications I've made in the securely-modified folder and the reasons why.
-
 
 ### 1. Always scan and patch your application and image
 __Why__:
