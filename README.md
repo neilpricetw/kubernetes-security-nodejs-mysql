@@ -114,6 +114,7 @@ const con = mysql.createConnection({
   database: fs.readFileSync("/etc/node-details/name").toString()
 });
 ```
+In the mysql manifest file I used secretKeyRef as I didn't have control of how the source image ingests the root password.
 
 ### 6. Run kubesec against your manifest files
 __Why__: 
@@ -213,7 +214,7 @@ You can verify it is in the AppArmor profiles list by running the following comm
 ```
 aa-status
 ```
-Now you can add it into your container manifest file like below (in securely-modified/kubernetes-manifests/mysql.yaml and node.yaml I've replaced localhost/deny-write with runtime/default which is simply confirming AppArmor is enabled but is not actually applying any security profile because I couldn't get it working in minikube but it works on standard kubernetes clusters):
+Now you can add it into your container manifest file like below (in securely-modified/kubernetes-manifests/mysql.yaml and node.yaml I've commented the annotations out as I couldn't get it working in minikube but it works on standard kubernetes clusters):
 ```
 spec:
   selector:
@@ -233,7 +234,7 @@ This may even prevent the container from running or if it does run you can test 
 
 ### 9. Apply Pod Security Standards to your cluster or namespace
 __Why__: 
-Pod Security Standards replaces pod security policies (PSPs) which are now deprecated.  You can apply them at the cluster level which is usually a flag that needs to be enabled when the cluster service starts (see pod-security-adminission-controller.yaml in this code base for more info).  For more flexibility it's easier to apply it at the namespace level (see namespace.yaml).  This also helps to reduce the liklihood of using the default namespace which should be avoided and isolate workloads and services into their own namespaces which is a security best practice.  Once the Pod Security Standards have been applied either to your cluster or namespace then it will either audit, warn or enforce security standards which should help you make your platform more secure.  
+Pod Security Standards replaces pod security policies (PSPs) which are now deprecated.  You can apply them at the cluster level which is usually a flag that needs to be enabled when the cluster service starts (see pod-  security-adminission-controller.yaml in this code base for more info).  For more flexibility it's easier to apply it at the namespace level (see namespace.yaml).  This also helps to reduce the liklihood of using the default namespace which should be avoided and isolate workloads and services into their own namespaces which is a security best practice.  Once the Pod Security Standards have been applied either to your cluster or namespace then it will either audit, warn or enforce security standards which should help you make your platform more secure.  
 
 __Preventative Steps__:
 To apply at the namespace see securely-modified/kubernetes-manifests/namespace.yaml also shown below which can be applied using kubectl.
@@ -252,6 +253,7 @@ metadata:
 ### 10. Run hadolint against your Dockerfiles
 __Why__: 
 Hadolint is a linting service that will provide best practice recommendations when reviewing your Dockerfile and it can easily be added into your CI/CD pipeline.
+
 __Preventative Steps__:
 It's easily run through Docker as per below:
 ```
@@ -269,7 +271,7 @@ Docker strongly recommends using COPY over ADD because as it's more transparent 
 __Why__: 
 The main security reason to apply resource requests and limits to the containers is to limit the risks to your cluster if any of the containers were compromised.  In theory the hacker is resourced limited as opposed to consuming resources across your whole cluster and possibly bringing everything offline.  
 
-__Steps__:
+__Preventative Steps__:
 In securely-modified/kubernetes-manifests/node.yaml and securely-modified/kubernetes-manifests/mysql.yaml you'll see resource requests and limits applied to the containers.
 ```
           resources:
@@ -285,6 +287,8 @@ In securely-modified/kubernetes-manifests/node.yaml and securely-modified/kubern
 ### 12. Reference container images by their sha256 hash
 __Why__: 
 The Sunburst SolarWinds supply chain hack was a very cleverly engineered attack.  I could spend 30 mins just talking about that.  In short the SolarWinds CI/CD pipeline was compromised, a hacker was able to add their own code into a legitimate trusted SolarWinds artifact that the pipeline creates.  The artifact was consumed by many large and small trusting organisations unwittingly creating a hole in their security.  The hacker also went back and fixed the pipeline and removed their code once SolarWinds customers had been infected.  There is much you can do in this space to harden your CI/CD pipelines like signing your artifacts.  One best practice is to not use latest or v1.1 tag names to reference images for your containers.  This is because these tags do not guarantee you are getting the image you expect, it could be modified.  Instead it's recommended that you reference the container images by their sha256 digests (if you have the image locally you can run docker images --digests to see the sha256 references) then there is 100% no doubt which image you are consuming.
+
+You can take this further by Cryptographic signing your build steps and artifacts which will can increase trust in the system / supply chain.  You can use Notary or Cosign for signing.  Another reason to do this is because of type squatting where packages with similar names will be made available which are malicious and can catch unsuspecting victims.
 
 __Preventative Steps__:
 So for the mysql container I've updated it to this:
@@ -490,9 +494,10 @@ Complete!
 Obviously I recommend focusing on refining permissions on the users and service accounts that you create.  I'm uncertain about the consequences of refining the permissions on system users and accounts but it could help make it more secure (thorough testing is definitely required).
 
 
-### 14. Run conftest against your manifest files
+### 14. Run security tests against your manifest files using Conftest
 __Why__: 
 [Conftest](https://www.conftest.dev/) is a utility to help you write tests against structured configuration data. For instance, you could write tests for your Kubernetes configurations, Tekton pipeline definitions, Terraform code, Serverless configs or any other structured data.  Conftest relies on the Rego language from Open Policy Agent for writing policies.  Open Policy Agent is a graduated project in the CNCF.  It's easy to run conftest either via docker or command line and add into your CI/CD pipeline, see [install documentation](https://www.conftest.dev/install/).
+
 __Preventative Steps__:
 To install conftest on your Mac run the following:
 ```
@@ -521,9 +526,10 @@ and the output:
 ```
 
 
-## Other Recommendations Not Covered in Detail
+## Container Security Tools for Testing for Weaknesses
 
-kubehunter and ccat and dockerscan
+[kube-hunter](https://github.com/aquasecurity/kube-hunter) hunts for security weaknesses in Kubernetes clusters. The tool was developed to increase awareness and visibility for security issues in Kubernetes environments.
 
-SigNoz, an open source APM can monitor metrics, traces, and logs of your Kubernetes cluster. It is built to support OpenTelemetry natively, the open source standard for instrumenting cloud-native applications. 
-https://github.com/SigNoz/signoz
+[ccat](https://github.com/RhinoSecurityLabs/ccat) is a tool for testing security of container environments.
+
+[dockerscan](https://github.com/cr0hn/dockerscan) is a Docker analysis & hacking tool.

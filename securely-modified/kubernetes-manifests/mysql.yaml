@@ -11,7 +11,7 @@ spec:
   accessModes:
     - ReadWriteOnce
   hostPath:
-    path: "/tmp/"
+    path: "/private/tmp/k8s-volumes/mysql"
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -50,8 +50,9 @@ spec:
     metadata:
       labels:
         app: mysql
-      annotations:
-        container.apparmor.security.beta.kubernetes.io/mysql: runtime/default # replace runtime/default with your custom profile, e.g. localhost/deny-write etc.
+      # AppArmor: unable to get working in minikube but tested successfully in other kubernetes platforms
+      #annotations: 
+      #  container.apparmor.security.beta.kubernetes.io/mysql: localhost/deny-write # replace with runtime/default or your custom profile, e.g. localhost/deny-write etc.
     spec:
       hostPID: false # Controls whether containers can share host process namespace
       hostIPC: false # Controls whether containers can share host process namespace
@@ -71,8 +72,11 @@ spec:
               memory: "128Mi"
               cpu: "500m"          
           env:
-            - name: MYSQL_ROOT_PASSWORD
-              value: password
+            - name: MYSQL_ROOT_PASSWORD          
+              valueFrom:
+                secretKeyRef:
+                  name: node-secrets
+                  key: pwd
         #  below commented out as the hardened image rapidfort/mariadb:latest wouldn't work on my Mac M1 ARM chipset but will on x86
         #- image: rapidfort/mariadb:latest
         #  name: mysql
