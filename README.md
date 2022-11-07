@@ -1,26 +1,26 @@
 # Kubernetes Security Best Practice Recommendations
 
-This repo has two examples of creating the same simple NodeJS / MySQL application running on Kubernetes.  The first in the insecure-original folder has no modifications and does not follow best practices, it literally just deploys the application.  The second in the securely-modified folder has modications from the original to make it more secure and inline with best practices.
+This repo has two examples of creating the same simple NodeJS / MySQL application running on Kubernetes.  The first in the insecure-original folder has no modifications and does not follow best practices, it literally just has a deployable application.  The second in the securely-modified folder has modications from the original to make it more secure and inline with best practices.
 
-Below goes into detail about each of the best practice modifications I've made explaining why it's good to implement them and how to implement them.  You'll find that there isn't a simple Kubernetes switch to enable making it secure but instead multiple recommended but optional steps you can take to reduce the chance of being hacked and if compromised reduce the possible attack surface area.
+Below goes into detail about each of the best practice modifications / recommendations I've made explaining why it's good to implement them and how to implement them.  You'll find that there isn't a simple Kubernetes switch to enable making the platform secure but instead multiple optional steps you can take to reduce the chance of being hacked and if compromised reduce the possible attack surface area.
 
-For details on how to build and deploy either the insecure or secure solutions using minikube check out their READMEs ([insecure-original readme](https://github.com/neilpricetw/kubernetes-security-nodejs-mysql/blob/main/insecure-original/README.md), [securely-modified readme](https://github.com/neilpricetw/kubernetes-security-nodejs-mysql/blob/main/securely-modified/README.md)).
+For details on how to build and deploy either the insecure or secure solutions using minikube check out their READMEs which are inside their respective folders ([insecure-original readme](https://github.com/neilpricetw/kubernetes-security-nodejs-mysql/blob/main/insecure-original/README.md), [securely-modified readme](https://github.com/neilpricetw/kubernetes-security-nodejs-mysql/blob/main/securely-modified/README.md)).
 
-## List of Security Modifications
+## List of Security Modifications / Recommendations
 
 ### 1. Always scan and patch your application and image
 __Why__:
-This is the minimal viable security which should be implemented.  Hackers have plenty of online documentation and specialist tools that can exploit known vulnerabilities.  If you don't patch your application and images then they will remain in a known vulnerable state which could have been avoided. Low hanging fruit for a seasoned hacker!  
+This is the minimal viable security which should be implemented.  Hackers have plenty of online documentation and specialist tools that can exploit known vulnerabilities.  If you don't patch your application and images then they will remain in a known vulnerable state which could have been avoided. Low hanging fruit for a hacker!  
 
 __Preventative Steps__:
-You can use __dependabot__ which is built into Github or __[Trivy](https://github.com/aquasecurity/trivy)__ to scan for package dependency vulnerabilities.  Interestingly when comparing the two Trivy picked up more vulnerabilities than Dependabot (but Dependabot picked up one that Trivy didn't detect).  Trivy can also scan container images for vulnerabilities and can be run on the command line or in a CI/CD pipeline and if desired stop a build if high or critical CVEs are detected.
-You can see in the [GitHub Action Code](https://github.com/neilpricetw/kubernetes-security-nodejs-mysql/blob/main/.github/workflows/securely-modified-ci.yaml) I am running Trivy against both the application code and then also against the image as it will pick up different vulnerabilities.
+You can use __dependabot__ which is built into Github or __[Trivy](https://github.com/aquasecurity/trivy)__ to scan for package dependency vulnerabilities.  Interestingly when comparing the two Trivy picked up more vulnerabilities than Dependabot (but Dependabot picked up one that Trivy didn't detect).  Trivy can also scan vulnerabilities in container images and can be run on the command line or in a CI/CD pipeline and if desired stop a build if high or critical CVEs are detected.
+You can see in the [GitHub Action Code](https://github.com/neilpricetw/kubernetes-security-nodejs-mysql/blob/main/.github/workflows/securely-modified-ci.yaml) I am running Trivy against both the application code as well as the container image as it will pick up different vulnerabilities.
 
 
 
 ### 2. Never run containers as root or privileged mode
 __Why__: 
-If your container gets compromised then running as root or priviliged mode (removes most of the isolation provided by the container) making it fairly easy for the hacker to break out of the container and gain full access to the host node, potentially the cluster, any kubernetes secrets and possibly all your data.  Once they have access to run commands on the host they could for example query the cluster API to create their own pods or write a key to /root/.ssh/authorized_keys on the host to gain remote access or worse.  In security tip 7 further down we'll show you how to ensure privileged mode is prohibited through the security context.  
+If your container gets compromised then running as root or priviliged mode (removes most of the isolation provided by the container) making it fairly easy for the hacker to break out of the container and gain full access to the host, potentially the cluster, any kubernetes secrets and possibly all your data.  Once they have access to run commands on the host they could for example query the cluster API to create their own pods or write a key to /root/.ssh/authorized_keys on the host to gain remote access or worse.  In the 7th recommendation further down this page I'll show you how to ensure privileged mode is prohibited through the security context.  
 
 __Preventative Steps__:
 In securely-modified/node-app/Dockerfile I've added the following as the last line which defines the user that the container should run as.
@@ -38,7 +38,7 @@ In securely-modified/kubernetes-manifests/mysql.yaml I've set the security conte
 
 ### 3. Run containers using distroless or scratch images (applicable to node in this example)
 __Why__: 
-The distroless images are a cut down version of the main image as it does not have bash or shell and many other unnecessary tools which when unavailable massively limits what the hacker can potentially do if your container gets compromised.  It also has the potential reduce the size of your image.  By default distroless images run as nonroot users.  You can add the :debug image tag which provides a busybox shell to enter when troubleshooting.  There are not distroless images for every scenario (there is no distroless image for mysql), [here](https://github.com/GoogleContainerTools/distroless) is the list of available images.  If you can't find a suitable distroless image then another option is using a scratch image although it's more complicated as you have to create everything from scratch.  
+The distroless images are a cut down version of the main image as it does not have bash or shell and many other unnecessary tools which when removed massively limits what the hacker can potentially do if your container gets compromised.  It also has the potential to reduce the size of your image.  By default distroless images run as nonroot users.  You can add the :debug image tag temporarily which provides a busybox shell to enter when troubleshooting.  There are not distroless images for every scenario (there is no distroless image for mysql), [here](https://github.com/GoogleContainerTools/distroless) is the list of available images.  If you can't find a suitable distroless image then another option is to use a scratch image although it's more complicated as you have to create everything from scratch.
 
 __Preventative Steps__:
 In securely-modified/node-app/Dockerfile we've updated it to have a build image which passes the contents to the stripped down distroless image.
@@ -63,7 +63,7 @@ __Why__:
 Similar to the 'Why' for distroless, this is about limiting the hacker's options if the container gets compromised.  The bash shell can be used to create a reverse shell for the hacker to gain access remotely if it's available.  
 
 __Preventative Steps__:
-In securely-modified/kubernetes-manifests/mysql.yaml I've commented out the security context relating to the user and updated the image to use a hardened image.  The user that the container runs as is not root but it's not clear who it is but I'm certain it doesn't have root permissions.  The hardened image massively reduces the amount of vulnerabilities, see https://frontrow.rapidfort.com/app/community/imageinfo/docker.io%2Fbitnami%2Fmariadb/vulns/original for the differences between a normal and hardened mariadb image.  I've left the hardened image commented out as the image was not compatible with the Mac M1 Chipset (I've confirmed the code works on [killercoda](https://killercoda.com/playgrounds/scenario/kubernetes)).
+In securely-modified/kubernetes-manifests/mysql.yaml I've commented out the security context relating to the user and updated the image to use a hardened image.  The user that the container runs as is not root but it's not clear who it is but I'm certain it doesn't have root permissions.  The hardened image massively reduces the amount of vulnerabilities, see [here](https://frontrow.rapidfort.com/app/community/imageinfo/docker.io%2Fbitnami%2Fmariadb/vulns/original) for the differences between a normal and hardened mariadb image.  I've left the hardened image commented out as the image was not compatible with my Mac M1 Chipset (I've confirmed the code works on [killercoda](https://killercoda.com/playgrounds/scenario/kubernetes)).
 ```
       #securityContext:
       #  runAsUser: 999 # run as mysql user
@@ -80,12 +80,14 @@ In securely-modified/kubernetes-manifests/mysql.yaml I've commented out the secu
 
 ### 5. Try not to store secret data as container environment variables
 __Why__: 
-It's very common for containers to read environment variables for secret data perhaps to connect to a database.  If your container gets compromised then the environment variables are likely to be the first place they look so it makes sense to not store secret data there which would make it too easy for the hacker.  Kubernetes provides secretRef and secretKeyRef options to add your kubernetes secrets as environment variables but it is safer still to store your secrets as files for the reason specified above.  It's important to go to these extra lengths because you need to do the upmost to protect your data.  
+It's very common for containers to read environment variables for secret data perhaps to connect to a database.  If your container gets compromised then the environment variables are likely to be the first place they look so it makes sense to not store secret data there which would make it very easy for the hacker.  Kubernetes provides secretRef and secretKeyRef options to add your kubernetes secrets as environment variables but it is safer still to store your secrets as files for the reason specified above.  It's important to go to these extra lengths because you need to do the upmost to protect your data.  
 
-It's also worth noting the Kubernetes secrets get stored in the etc'd Kubernetes internal database in plain text.  If you wanted to be more secure your could store your [secrets in your external key safe](https://github.com/external-secrets/external-secrets) like AWS Secrets Manager, HashiCorp Vault, Google Secrets Manager and Azure Key Vault and have Kubernetes reference it instead which is definitely more secure.
+It's also worth noting the Kubernetes secrets get stored in the etcd Kubernetes internal database in plain text.  If you wanted to be more secure your could store your [secrets in your external key safe](https://github.com/external-secrets/external-secrets) like AWS Secrets Manager, HashiCorp Vault, Google Secrets Manager and Azure Key Vault and have Kubernetes reference it instead which is definitely more secure.
+
+Another alternative to using secrets and baking them into images or injecting them in during CI/CD is to use [SPIFFE](https://spiffe.io/)(Secure Production Identity Framework for Everyone).  It uses certificates to authenticate bewteen services and workloads and could be an even more secure option.
 
 __Preventative Steps__:
-In securely-modified/kubernetes-manifests/node.yaml I removed this...
+To remove my secrets as environment variables and add them as files in securely-modified/kubernetes-manifests/node.yaml I removed this...
 ```
           env:
           - name: DB_USER
@@ -97,7 +99,7 @@ In securely-modified/kubernetes-manifests/node.yaml I removed this...
           - name: DB_NAME
             value: mysql 
 ```
-and adding this code below to securely-modified/kubernetes-manifests/node.yaml.
+and added this code below to securely-modified/kubernetes-manifests/node.yaml.
 ```
           volumeMounts:
             - name: secrets-volume
@@ -107,7 +109,7 @@ and adding this code below to securely-modified/kubernetes-manifests/node.yaml.
           secret:
             secretName: node-secrets              
 ```
-It references a new Kubernetes secret (see secrets.yaml) which needs to be applied to the cluster before the node.yaml is applied.  This secrets.yaml file should not have the actual values (secrets) hard coded in, there should be placeholders that get updated in the CI/CD pipeline which retrieves the secret data from a key safe or vault service and updates the values.  You will also need to change the application code to retrieve the data from the files and unencode them, see below in index.js:
+It references a new Kubernetes secret (see secrets.yaml) which needs to be applied to the cluster before mysql.yaml and node.yaml are applied.  This secrets.yaml file should not have the actual values (secrets) hard coded in, there should be placeholders that get updated in the CI/CD pipeline which retrieves the secret data from a key safe or vault service and updates the values.  You will also need to change the application code to retrieve the data from the files and unencode them, see below in index.js:
 ```
 const con = mysql.createConnection({
   host: fs.readFileSync("/etc/node-details/host").toString(),
@@ -120,10 +122,10 @@ In the mysql manifest file I used secretKeyRef as I didn't have control of how t
 
 ### 6. Run kubesec against your manifest files
 __Why__: 
-Kubesec is a simple tool to validate the security of a kubernetes resources.  It returns a risk score for the resource, and advises on how to tighten security.  It's very easy to use and can be built into a CI/CD pipeline if desired.  
+Kubesec is a simple tool to validate the security of kubernetes resources.  It returns a risk score for the resource, and advises on how to tighten security.  It's very easy to use and can be built into a CI/CD pipeline if desired.  
 
 __Preventative Steps__:
-Running the following will generate json output and a score for each.  The insecure file scored 0 whereas the secure file should be higher once we've applied the best practices.  Running the scan against the insecrure and the secure manifests you'll see a big difference.
+Running the following will generate json output and a score for each.  The insecure file scored 0 whereas the secure file should be significantly higher.  Running the scan against both the insecure and the secure manifests you'll be able to compare the differences.
 ```
 docker run -i kubesec/kubesec:512c5e0 scan /dev/stdin < insecure-original/kubernetes-manifests/mysql.yaml
 docker run -i kubesec/kubesec:512c5e0 scan /dev/stdin < securely-modified/kubernetes-manifests/mysql.yaml
@@ -167,7 +169,7 @@ Here's some example output:
 
 ### 7. Define security contexts and seccomp profiles for your containers
 __Why__: 
-As you've seen from the kubesec output it's best practice to apply multiple security context settings and a seccomp profile which all go towards limiting a hacker's options if the container gets compromised and will generally reduce the attack surface area.  Many of these recommendations and more can be found in the [NSA Kubernetes Hardening Guide](https://media.defense.gov/2022/Aug/29/2003066362/-1/-1/0/CTR_KUBERNETES_HARDENING_GUIDANCE_1.2_20220829.PDF) which includes descriptions for each setting and why you may wish to apply them.  [Seccomp](https://kubernetes.io/docs/tutorials/security/seccomp/) profiles can only be applied to containers that are not running in privileged mode.  One option is to set seccomp profile to RuntimeDefault which provides a strong set of security defaults while preserving the functionality of the workload.  
+As you've seen from the kubesec output it's best practice to apply multiple security context settings and a seccomp profile which all go towards limiting a hacker's options if the container gets compromised and will generally reduce the attack surface area.  Many of these recommendations and more can be found in the [NSA Kubernetes Hardening Guide](https://media.defense.gov/2022/Aug/29/2003066362/-1/-1/0/CTR_KUBERNETES_HARDENING_GUIDANCE_1.2_20220829.PDF) which includes descriptions for most of these settings and why you may wish to apply them.  [Seccomp](https://kubernetes.io/docs/tutorials/security/seccomp/) profiles can only be applied to containers that are not running in privileged mode.  One option is to set seccomp profile to RuntimeDefault which provides a strong set of security defaults while preserving the functionality of the workload.  
 
 __Preventative Steps__:
 In the container deployments manifest files (securely-modified/kubernetes-manifests/) I've added these lines:
@@ -198,7 +200,11 @@ __Why__:
 There is some overlap with security context and specifically Linux capabilities but I feel that the AppArmor also offers you greater flexibility to get granular on restricting permissions inside a container.  Associating an AppArmor well designed profile with your container can definitely reduce the risk if your container gets compromised by a hacker.  
 
 __Preventative Steps__:
-For AppArmor you need to ensure it's enabled on the cluster (you can check /sys/module/apparmor/parameters/enabled on each node to confirm this).  Then you can create a custom profile file (in this example called 'deny-write') and save it on all the Kubernetes nodes in directory /etc/apparmor.d.  This is just an example of the deny-write file below which prevents writing contents to the filesystem inside the container (which is easy to test).
+For AppArmor you need to ensure it's enabled on the cluster (you can check /sys/module/apparmor/parameters/enabled on each node to confirm this).  Then you can create a custom profile file (in this example called 'deny-write') and save it on all the Kubernetes nodes in directory /etc/apparmor.d.  This is just an example of the deny-write file below which prevents writing contents to the filesystem inside the container (which is easy to test).  On minikube you need to ssh in first to add files to the node:
+```
+minikube ssh
+```
+Then you can add this file to /etc/apparmor.d/:
 ```
 #include <tunables/global>
 profile deny-write flags=(attach_disconnected) {
@@ -216,7 +222,7 @@ You can verify it is in the AppArmor profiles list by running the following comm
 ```
 aa-status
 ```
-Now you can add it into your container manifest file like below (in securely-modified/kubernetes-manifests/mysql.yaml and node.yaml I've commented the annotations out as I couldn't get it working in minikube but it works on standard kubernetes clusters):
+Now you can add it into your container manifest file like below (in securely-modified/kubernetes-manifests/mysql.yaml and node.yaml I've commented the annotations out as I couldn't get it working in minikube but it works on standard kubernetes clusters including [killercoda](https://killercoda.com/playgrounds/scenario/kubernetes)):
 ```
 spec:
   selector:
@@ -231,12 +237,12 @@ spec:
       annotations:
         container.apparmor.security.beta.kubernetes.io/mysql: localhost/deny-write
 ```
-This may even prevent the container from running or if it does run you can test it by trying to write a file to the filesystem and you should get permission denied.  A good example of a more complex custom AppArmor profile which is commonly used can be found [here](https://github.com/containers/common/blob/main/pkg/apparmor/apparmor_linux_template.go).
+AppArmor profiles may prevent your container from running, if so you'll need to tweak it until it works.  With the example above you can test it by trying to write a file to the filesystem, you should get permission denied.  A good example of a more complex custom AppArmor profile which is commonly used can be found [here](https://github.com/containers/common/blob/main/pkg/apparmor/apparmor_linux_template.go).
 
 
 ### 9. Apply Pod Security Standards to your cluster or namespace
 __Why__: 
-Pod Security Standards replaces pod security policies (PSPs) which are now deprecated.  You can apply them at the cluster level which is usually a flag that needs to be enabled when the cluster service starts (see pod-  security-adminission-controller.yaml in this code base for more info).  For more flexibility it's easier to apply it at the namespace level (see namespace.yaml).  This also helps to reduce the liklihood of using the default namespace which should be avoided and isolate workloads and services into their own namespaces which is a security best practice.  Once the Pod Security Standards have been applied either to your cluster or namespace then it will either audit, warn or enforce security standards which should help you make your platform more secure.  
+Pod Security Standards replaces pod security policies (PSPs) which are now deprecated.  You can apply POD Security Standards at the cluster level by using a start up flag that enables and enforces it (see securely-modified/kubernetes-manifests/pod-security-adminission-controller.yaml for more info).  For more flexibility it's easier to apply it at the namespace level (see securely-modified/kubernetes-manifests/namespace.yaml).  This also helps to reduce the liklihood of using the default namespace which should be avoided, therefore helping to isolate workloads and services into their own namespaces which is a security best practice.  Once the Pod Security Standards have been applied either to your cluster or namespace then it will either audit, warn or enforce security standards which should help to make your platform more secure.  
 
 __Preventative Steps__:
 To apply at the namespace see securely-modified/kubernetes-manifests/namespace.yaml also shown below which can be applied using kubectl.
@@ -271,7 +277,7 @@ Docker strongly recommends using COPY over ADD because as it's more transparent 
 
 ### 11. Apply container resource limits to CPU and Memory
 __Why__: 
-The main security reason to apply resource requests and limits to the containers is to limit the risks to your cluster if any of the containers were compromised.  In theory the hacker is resourced limited as opposed to consuming resources across your whole cluster and possibly bringing everything offline.  
+The main security reason to apply resource requests and limits to the containers is to limit the risks to your cluster if any of the containers were compromised.  In theory the hacker is resource limited and should not be able to consume all your cluster resources and possibly bring everything offline.  
 
 __Preventative Steps__:
 In securely-modified/kubernetes-manifests/node.yaml and securely-modified/kubernetes-manifests/mysql.yaml you'll see resource requests and limits applied to the containers.
@@ -288,9 +294,9 @@ In securely-modified/kubernetes-manifests/node.yaml and securely-modified/kubern
 
 ### 12. Reference container images by their sha256 hash
 __Why__: 
-The Sunburst SolarWinds supply chain hack was a very cleverly engineered attack.  I could spend 30 mins just talking about that.  In short the SolarWinds CI/CD pipeline was compromised, a hacker was able to add their own code into a legitimate trusted SolarWinds artifact that the pipeline creates.  The artifact was consumed by many large and small trusting organisations unwittingly creating a hole in their security.  The hacker also went back and fixed the pipeline and removed their code once SolarWinds customers had been infected.  There is much you can do in this space to harden your CI/CD pipelines like signing your artifacts.  One best practice is to not use latest or v1.1 tag names to reference images for your containers.  This is because these tags do not guarantee you are getting the image you expect, it could be modified.  Instead it's recommended that you reference the container images by their sha256 digests (if you have the image locally you can run docker images --digests to see the sha256 references) then there is 100% no doubt which image you are consuming.
+The Sunburst SolarWinds supply chain hack was a very cleverly engineered attack.  I could spend 30 mins just talking about that.  In short the SolarWinds CI/CD pipeline was compromised, a hacker was able to add their own code into a legitimate trusted SolarWinds artifact that the pipeline creates.  The 'trusted' artifact was unwittingly consumed by many large and small organisations creating a hole in their security.  The hacker also went back and fixed the pipeline and removed their code once SolarWinds customers had been infected.  There is much you can do in this space to harden your CI/CD pipelines like signing your artifacts.  One best practice is to not use latest or v1.1 tag names to reference images for your containers.  This is because these tags do not guarantee you are getting the image you expect, it could have been modified.  Instead it's recommended that you reference the container images by their sha256 digests (if you have the image locally you can run docker images --digests to see the sha256 references) then there is 100% no doubt which image you are consuming.
 
-You can take this further by Cryptographic signing your build steps and artifacts which will can increase trust in the system / supply chain.  You can use Notary or Cosign for signing.  Another reason to do this is because of type squatting where packages with similar names will be made available which are malicious and can catch unsuspecting victims.
+You can take this further by Cryptographic signing of your build steps and artifacts which will can increase trust in the system / supply chain.  You can use Notary or Cosign for signing.  Another reason to do this is because of type squatting where packages with similar names will be made available which are malicious and can catch out unsuspecting victims.
 
 __Preventative Steps__:
 So for the mysql container I've updated it to this:
@@ -319,19 +325,23 @@ CMD ["index.js"]
 ### 13. Implement auditing and apply granular RBAC (least privilege)
 __Why__: 
 You may or may not be shocked to hear that auditing is not enabled out of the box.  This also includes managed Kubernetes clusters like EKS or AKS where you need to enable it.  Audit logs provide a comprehensive overview of everything happening in your cluster, allowing you to make informed decisions. It’s important to note that improperly configured audit logs can contain so much information that they’re impossible to use, so it’s important to make sure that your configuration gives you enough information to get the logs you need, but not so much that it’s overwhelming.  Some of the key information recorded in the audit logs are:
-- User Information and Originating IP
-- Information About Requests That Were Initiated and Executed
-- Response Status of the Actions Performed
-I've found these links useful in helping to understand and configure Kubernetes auditing([kubernetes.io - k8s auditing](https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/#advanced-audit), [signoz.io - k8s auditing](https://signoz.io/blog/kubernetes-audit-logs/) and [containiq.com - k8s auditing](https://www.containiq.com/post/kubernetes-audit-logs)).
+- User information and originating IP
+- Information about requests that were initiated and executed
+- Response status of the actions performed
 
-Once auditing is enabled on your cluster there is a useful tool called [audit2rbac](https://github.com/liggitt/audit2rbac) which takes a Kubernetes audit log and username or service account as input, and generates RBAC role and binding objects that cover all the API requests made by that user.  This allows you to refine the permissions of users and service accounts to become least privilege.
+I've found these links useful in helping to understand and configure Kubernetes auditing:
+- ([kubernetes.io - k8s auditing](https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/#advanced-audit)
+- [signoz.io - k8s auditing](https://signoz.io/blog/kubernetes-audit-logs/)
+- [containiq.com - k8s auditing](https://www.containiq.com/post/kubernetes-audit-logs)).
+
+Once auditing is enabled on your cluster there is a useful tool called [audit2rbac](https://github.com/liggitt/audit2rbac) which takes a Kubernetes audit log and username or service account as input, and generates RBAC role and binding objects that cover all the API requests made by that user.  This allows you to refine the permissions of users and service accounts to be aligned with their needs and no more (least privilege).
 
 __Preventative Steps__:
 To enable an audit policy on my minikube cluster I've created securely-modified/kubernetes-manifests/audit-policy.yaml, this cannot be applied via kubectl, it needs to be created on the primary node of the cluster (/etc/kubernetes/audit-policy.yaml).  On minikube you need to ssh in first:
 ```
 minikube ssh
 ```
-Once ssh'd in to the primary node create the file in /etc/kubernetes.  Then you need to create audit.log in the following directory as per the following commands. This is where Kubernetes will save your audit logs.
+Once ssh'd in to the primary node create the audit-policy.yaml file in /etc/kubernetes (copying the contents from my example).  Then you need to create audit.log in the following directory as per the following commands. This is where Kubernetes will save your audit logs.
 ```
 sudo mkdir /var/log/kubernetes/ && cd /var/log/kubernetes/
 sudo mkdir audit/ && sudo touch audit.log
@@ -377,7 +387,7 @@ Now you have access to the audit logs you can send them to a SIEM / monitoring p
 ```
 ./audit2rbac -f audit.log --user system:kube-scheduler
 ```
-Which returned the recommended least privilege permissions for that user which you can then choose to apply to your cluster:
+Which returned the recommended least privilege permissions for the user system:kube-scheduler which you can then choose to apply to your cluster:
 ```
 root@168039c36b12:/# ./audit2rbac -f audit.log --user system:kube-scheduler
 Opening audit source...
@@ -498,14 +508,14 @@ Obviously I recommend focusing on refining permissions on the users and service 
 
 ### 14. Apply network policies to lock down network communication
 __Why__: 
-By default the Kubernetes network is very open, all pods can usually talk to all other pods without too much difficulty.  You can apply network policies to restrict the traffic flow so that only the pods you want can talk to the pods they need to talk to.  If your cluster was compromised this would make it more difficult for the hacker to access your data.
+By default the Kubernetes network is very open, all pods can usually talk to all other pods without too much difficulty.  You can apply network policies to restrict the traffic flow so only specific pods can talk to specific pods.  If your cluster was compromised this would make it more difficult for the hacker to access your data.
 
 __Preventative Steps__:
 In minikube I needed to start it with a network flag to enable the network plugin:
 ```
 minikube start --cni calico
 ```
-Then apply network-policy.yaml (shown below) which enforces the mysql pod will only allow traffic on port 3306 from pods labelled node.
+Then apply network-policy.yaml (shown below) which enforces that the mysql pod will only allow traffic on port 3306 from pods labelled node.
 ```
 kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
@@ -559,10 +569,15 @@ and the output:
 ```
 
 
-## Container Security Tools for Testing for Weaknesses
+## Security Tools for Testing for Kubernetes / Container Weaknesses
 
 [kube-hunter](https://github.com/aquasecurity/kube-hunter) hunts for security weaknesses in Kubernetes clusters. The tool was developed to increase awareness and visibility for security issues in Kubernetes environments.
 
 [ccat](https://github.com/RhinoSecurityLabs/ccat) is a tool for testing security of container environments.
 
 [dockerscan](https://github.com/cr0hn/dockerscan) is a Docker analysis & hacking tool.
+
+
+## Recommended Reading
+
+[Hacking Kubernetes](https://www.oreilly.com/library/view/hacking-kubernetes/9781492081722/) is a really insightful read and alarming too.  It's the only IT security book I've read from start to finish (which says a lot either about myself or IT security books in general).
