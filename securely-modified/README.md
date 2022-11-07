@@ -9,6 +9,7 @@ This repo has two examples of creating the same simple NodeJS / MySQL applicatio
 - start minikube and run the following to install nginx ingress and ensure that the docker images you build will be accessed by minikube
 
 ```
+minikube start --cni calico
 minikube addons enable ingress
 eval $(minikube -p minikube docker-env)
 ```

@@ -494,7 +494,38 @@ Complete!
 Obviously I recommend focusing on refining permissions on the users and service accounts that you create.  I'm uncertain about the consequences of refining the permissions on system users and accounts but it could help make it more secure (thorough testing is definitely required).
 
 
-### 14. Run security tests against your manifest files using Conftest
+### 14. Apply network policies to lock down network communication
+__Why__: 
+By default the Kubernetes network is very open, all pods can usually talk to all other pods without too much difficulty.  You can apply network policies to restrict the traffic flow so that only the pods you want can talk to the pods they need to talk to.  If your cluster was compromised this would make it more difficult for the hacker to access your data.
+
+__Preventative Steps__:
+In minikube I needed to start it with a network flag to enable the network plugin:
+```
+minikube start --cni calico
+```
+Then apply network-policy.yaml (shown below) which enforces the mysql pod will only allow traffic on port 3306 from pods labelled node.
+```
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: access-mysql
+spec:
+  podSelector:
+    matchLabels:
+      app: mysql
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: node
+    ports:
+      - protocol: TCP
+        port: 3306
+```
+There's some other good examples of network policies [here](https://github.com/ahmetb/kubernetes-network-policy-recipes).
+
+
+### 15. Run security tests against your manifest files using Conftest
 __Why__: 
 [Conftest](https://www.conftest.dev/) is a utility to help you write tests against structured configuration data. For instance, you could write tests for your Kubernetes configurations, Tekton pipeline definitions, Terraform code, Serverless configs or any other structured data.  Conftest relies on the Rego language from Open Policy Agent for writing policies.  Open Policy Agent is a graduated project in the CNCF.  It's easy to run conftest either via docker or command line and add into your CI/CD pipeline, see [install documentation](https://www.conftest.dev/install/).
 

@@ -1,0 +1,21 @@
+# for minikube requires following start flag to enable the network plugin
+# minikube start --cni calico
+# this policy restricts access to mysql from the node pod only
+# here's a good resource for other network policy examples https://github.com/ahmetb/kubernetes-network-policy-recipes
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: access-mysql
+spec:
+  podSelector:
+    matchLabels:
+      app: mysql
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: node
+    ports:
+      - protocol: TCP
+        port: 3306
+      
