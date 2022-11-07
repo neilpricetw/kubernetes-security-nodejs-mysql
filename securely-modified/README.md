@@ -1,4 +1,4 @@
-# Kubernetes Security Best Practice Recommendations
+# Kubernetes Securely Modified Simple NodeJS / MySQL Application Deployment Instructions
 
 This folder has a simple NodeJS / MySQL application running on Kubernetes which has multiple security modifications and is aligned to best practice and works as expected.
 
