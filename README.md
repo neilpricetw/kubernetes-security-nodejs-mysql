@@ -78,9 +78,11 @@ In securely-modified/kubernetes-manifests/mysql.yaml I've commented out the secu
 ```
 
 
-### 5. Don't store secret data as container environment variables
+### 5. Try not to store secret data as container environment variables
 __Why__: 
 It's very common for containers to read environment variables for secret data perhaps to connect to a database.  If your container gets compromised then the environment variables are likely to be the first place they look so it makes sense to not store secret data there which would make it too easy for the hacker.  Kubernetes provides secretRef and secretKeyRef options to add your kubernetes secrets as environment variables but it is safer still to store your secrets as files for the reason specified above.  It's important to go to these extra lengths because you need to do the upmost to protect your data.  
+
+It's also worth noting the Kubernetes secrets get stored in the etc'd Kubernetes internal database in plain text.  If you wanted to be more secure your could store your [secrets in your external key safe](https://github.com/external-secrets/external-secrets) like AWS Secrets Manager, HashiCorp Vault, Google Secrets Manager and Azure Key Vault and have Kubernetes reference it instead which is definitely more secure.
 
 __Preventative Steps__:
 In securely-modified/kubernetes-manifests/node.yaml I removed this...

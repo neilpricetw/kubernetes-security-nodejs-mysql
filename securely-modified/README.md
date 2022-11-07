@@ -1,6 +1,6 @@
-# Kubernetes Security Repo with a Basic NodeJS and MySQL Example
+# Kubernetes Security Best Practice Recommendations
 
-This repo has two examples of creating the same simple NodeJS / MySQL application running on Kubernetes.  The first in the insecure-original folder has no modifications and has various security flaws.  The second in the securely-modified folder has modications from the original to make it more secure and inline with best practices. 
+This folder has a simple NodeJS / MySQL application running on Kubernetes which has multiple security modifications and is aligned to best practice and works as expected.
 
 ## Pre-requisites
 
@@ -14,33 +14,36 @@ minikube addons enable ingress
 eval $(minikube -p minikube docker-env)
 ```
 
-Note: two possible alternatives to minikube are [Kind](https://kind.sigs.k8s.io/) which is still run locally or [killercoda](https://killercoda.com/playgrounds/scenario/kubernetes) which provides an online kubernetes playground.
+Note: if you don't wish to use minikube and don't have access to another Kubernetes platform there are two possible alternatives I'm aware of.  [Kind](https://kind.sigs.k8s.io/) which is run locally or [killercoda](https://killercoda.com/playgrounds/scenario/kubernetes) which provides an online kubernetes playground.
 
 ## Build and Deploy the Insecure-Original Application
 
-Run the following:
+Run the following to deploy this simple NodeJS / MySQL application:
 
 ```
-cd insecure-original/node-app
+cd securely-modified/node-app
 docker build . -t node-app-secure:v1
-kubectl apply -f ../kubernetes-manifests/mysql.yaml
-kubectl apply -f ../kubernetes-manifests/node.yaml
-kubectl apply -f ../kubernetes-manifests/ingress.yaml
+kubectl apply -f ../kubernetes-manifests/namespace.yaml
+kubectl apply -f ../kubernetes-manifests/secrets.yaml -n app
+kubectl apply -f ../kubernetes-manifests/network-policy.yaml -n app
+kubectl apply -f ../kubernetes-manifests/mysql.yaml -n app
+kubectl apply -f ../kubernetes-manifests/node.yaml -n app
+kubectl apply -f ../kubernetes-manifests/ingress.yaml -n app
 ```
 
-To access the application you have two options, via the service which will provide a local URL you enter into the browser to see the application:
+To access the application you have two options.  You can access it via the service which will provide a local URL you enter into the browser to see the application:
 
 ```
 minikube service node --url
 ```
 
-Or via the ingress you will need to edit your /etc/hosts file first and add in the following (this is needed on the Mac, unsure for other platforms) 
+Or via the ingress you will need to edit your /etc/hosts file first and add in the following (this is needed on the Mac, unsure for other platforms).
 
 ```
-127.0.0.1 minikube.local
+127.0.0.1 isellstuffonline.local
 ```
 
-Thenon the terminal run the following and then access minikube.local in the browser
+Then on the terminal run the following, then you can access isellstuffonline.local in the browser.
 
 ```
 minikube tunnel
