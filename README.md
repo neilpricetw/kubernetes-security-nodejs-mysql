@@ -233,7 +233,7 @@ This may even prevent the container from running or if it does run you can test 
 
 ### 9. Apply Pod Security Standards to your cluster or namespace
 __Why__: 
-Pod Security Standards replaces pod security policies (PSPs) which are now deprecated.  You can apply them at the cluster level which is usually a flag that needs to be enabled when the cluster service starts (see pod_security_adminission_controller.yaml in this code base for more info).  For more flexibility it's easier to apply it at the namespace level (see namespace.yaml).  This also helps to reduce the liklihood of using the default namespace which should be avoided and isolate workloads and services into their own namespaces which is a security best practice.  Once the Pod Security Standards have been applied either to your cluster or namespace then it will either audit, warn or enforce security standards which should help you make your platform more secure.  
+Pod Security Standards replaces pod security policies (PSPs) which are now deprecated.  You can apply them at the cluster level which is usually a flag that needs to be enabled when the cluster service starts (see pod-security-adminission-controller.yaml in this code base for more info).  For more flexibility it's easier to apply it at the namespace level (see namespace.yaml).  This also helps to reduce the liklihood of using the default namespace which should be avoided and isolate workloads and services into their own namespaces which is a security best practice.  Once the Pod Security Standards have been applied either to your cluster or namespace then it will either audit, warn or enforce security standards which should help you make your platform more secure.  
 
 __Preventative Steps__:
 To apply at the namespace see securely-modified/kubernetes-manifests/namespace.yaml also shown below which can be applied using kubectl.
@@ -492,12 +492,33 @@ Obviously I recommend focusing on refining permissions on the users and service 
 
 ### 14. Run conftest against your manifest files
 __Why__: 
-Open Policy Agent?
+[Conftest](https://www.conftest.dev/) is a utility to help you write tests against structured configuration data. For instance, you could write tests for your Kubernetes configurations, Tekton pipeline definitions, Terraform code, Serverless configs or any other structured data.  Conftest relies on the Rego language from Open Policy Agent for writing policies.  Open Policy Agent is a graduated project in the CNCF.  It's easy to run conftest either via docker or command line and add into your CI/CD pipeline, see [install documentation](https://www.conftest.dev/install/).
 __Preventative Steps__:
+To install conftest on your Mac run the following:
+```
+brew install conftest
+```
+To run it against the insecure kubernetes node manifest file:
+```
+cd securely-modified/kubernetes-manifests;
+conftest test ../../insecure-original/kubernetes-manifests/node.yaml
+```
+which produces this output:
+```
+WARN - ../../insecure-original/kubernetes-manifests/node.yaml - main - Containers should have resource limits in Deployment node
+FAIL - ../../insecure-original/kubernetes-manifests/node.yaml - main - Containers must have a seccompProfile in Deployment node
+FAIL - ../../insecure-original/kubernetes-manifests/node.yaml - main - Containers must have a securityContext in Deployment node
 
-
-
-
+10 tests, 7 passed, 1 warning, 2 failures, 0 exceptions
+```
+Then against the secure kubernetes manifest node file:
+```
+conftest test node.yaml
+```
+and the output:
+```
+10 tests, 10 passed, 0 warnings, 0 failures, 0 exceptions
+```
 
 
 ## Other Recommendations Not Covered in Detail
