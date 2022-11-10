@@ -20,7 +20,7 @@ You can see in the [GitHub Action Code](https://github.com/neilpricetw/kubernete
 
 ### 2. Never run containers as root or privileged mode
 __Why__: 
-If your container gets compromised then running as root or priviliged mode (removes most of the isolation provided by the container) making it fairly easy for the hacker to break out of the container and gain full access to the host, potentially the cluster, any kubernetes secrets and possibly all your data.  Once they have access to run commands on the host they could for example query the cluster API to create their own pods or write a key to /root/.ssh/authorized_keys on the host to gain remote access or worse.  In the 7th recommendation further down this page I'll show you how to ensure privileged mode is prohibited through the security context.  
+If your container gets compromised then running as root or privileged mode removes most of the isolation provided by the container making it fairly easy for the hacker to break out of the container and gain full access to the host, potentially the cluster, any kubernetes secrets and possibly all your data.  Once they have access to run commands on the host they could for example query the cluster API to create their own pods or write a key to /root/.ssh/authorized_keys on the host to gain remote access or worse.  In the 7th recommendation further down this page I'll show you how to ensure privileged mode is prohibited through the security context.  
 
 __Preventative Steps__:
 In securely-modified/node-app/Dockerfile I've added the following as the last line which defines the user that the container should run as.
@@ -36,7 +36,7 @@ In securely-modified/kubernetes-manifests/mysql.yaml I've set the security conte
 ```
 
 
-### 3. Run containers using distroless or scratch images (applicable to node in this example)
+### 3. Use distroless or scratch images for your application (applicable to node in this example)
 __Why__: 
 The distroless images are a cut down version of the main image as it does not have bash or shell and many other unnecessary tools which when removed massively limits what the hacker can potentially do if your container gets compromised.  It also has the potential to reduce the size of your image.  By default distroless images run as nonroot users.  You can add the :debug image tag temporarily which provides a busybox shell to enter when troubleshooting.  There are not distroless images for every scenario (there is no distroless image for mysql), [here](https://github.com/GoogleContainerTools/distroless) is the list of available images.  If you can't find a suitable distroless image then another option is to use a scratch image although it's more complicated as you have to create everything from scratch.
 
@@ -169,7 +169,7 @@ Here's some example output:
 
 ### 7. Define security contexts and seccomp profiles for your containers
 __Why__: 
-As you've seen from the kubesec output it's best practice to apply multiple security context settings and a seccomp profile which all go towards limiting a hacker's options if the container gets compromised and will generally reduce the attack surface area.  Many of these recommendations and more can be found in the [NSA Kubernetes Hardening Guide](https://media.defense.gov/2022/Aug/29/2003066362/-1/-1/0/CTR_KUBERNETES_HARDENING_GUIDANCE_1.2_20220829.PDF) which includes descriptions for most of these settings and why you may wish to apply them.  [Seccomp](https://kubernetes.io/docs/tutorials/security/seccomp/) profiles can only be applied to containers that are not running in privileged mode.  One option is to set seccomp profile to RuntimeDefault which provides a strong set of security defaults while preserving the functionality of the workload.  
+As you've seen from the kubesec output it's best practice to apply multiple security context settings and a seccomp profile which all go towards limiting a hacker's options if the container gets compromised and will generally reduce the attack surface area.  Many of these recommendations and more can be found in the [NSA Kubernetes Hardening Guide](https://media.defense.gov/2022/Aug/29/2003066362/-1/-1/0/CTR_KUBERNETES_HARDENING_GUIDANCE_1.2_20220829.PDF) which includes descriptions for most of these settings and why you may wish to apply them.  [Seccomp](https://kubernetes.io/docs/tutorials/security/seccomp/) profiles can only be applied to containers that are not running in privileged mode.  One option is to set seccomp profile to RuntimeDefault which provides a strong set of security defaults while preserving the functionality of the workload.
 
 __Preventative Steps__:
 In the container deployments manifest files (securely-modified/kubernetes-manifests/) I've added these lines:
@@ -277,7 +277,7 @@ Docker strongly recommends using COPY over ADD because as it's more transparent 
 
 ### 11. Apply container resource limits to CPU and Memory
 __Why__: 
-The main security reason to apply resource requests and limits to the containers is to limit the risks to your cluster if any of the containers were compromised.  In theory the hacker is resource limited and should not be able to consume all your cluster resources and possibly bring everything offline.  
+The main security reason to apply resource requests and limits to the containers is to limit the risks to your cluster if any of the containers were compromised.  In theory the hacker is resource limited and should not be able to consume all your cluster resources and possibly bring everything offline.  This can be applied at the cluster, namespace or container level.
 
 __Preventative Steps__:
 In securely-modified/kubernetes-manifests/node.yaml and securely-modified/kubernetes-manifests/mysql.yaml you'll see resource requests and limits applied to the containers.
@@ -334,7 +334,11 @@ I've found these links useful in helping to understand and configure Kubernetes 
 - [signoz.io - k8s auditing](https://signoz.io/blog/kubernetes-audit-logs/)
 - [containiq.com - k8s auditing](https://www.containiq.com/post/kubernetes-audit-logs)).
 
-Once auditing is enabled on your cluster there is a useful tool called [audit2rbac](https://github.com/liggitt/audit2rbac) which takes a Kubernetes audit log and username or service account as input, and generates RBAC role and binding objects that cover all the API requests made by that user.  This allows you to refine the permissions of users and service accounts to be aligned with their needs and no more (least privilege).
+Once auditing is enabled on your cluster then you use the logs to identify who (often a service account) is doing what and when.  There are two types of service accounts in Kubernetes:
+- User Account: allowing humans access to the Kubernetes cluster. Any user needs to get authenticated by the API server to do so usually via a command line tool like kubectl or helm. A user account can be an admin or a developer who is trying to access the cluster level resources.
+- Service Account: It is used to authenticate machine level processes to get access to our Kubernetes cluster (similar to an IAM role attached to an EC2 in AWS). The API server is responsible for such authentication to the processes running in the pod.
+
+there is a useful tool called [audit2rbac](https://github.com/liggitt/audit2rbac) which takes a Kubernetes audit log and username or service account as input, and generates RBAC role and binding objects that cover all the API requests made by that user.  This allows you to refine the permissions of users and service accounts to be aligned with their needs and no more (least privilege).
 
 __Preventative Steps__:
 To enable an audit policy on my minikube cluster I've created securely-modified/kubernetes-manifests/audit-policy.yaml, this cannot be applied via kubectl, it needs to be created on the primary node of the cluster (/etc/kubernetes/audit-policy.yaml).  On minikube you need to ssh in first:
@@ -577,6 +581,7 @@ and the output:
 
 [dockerscan](https://github.com/cr0hn/dockerscan) is a Docker analysis & hacking tool.
 
+[AmiContained](https://github.com/genuinetools/amicontained) is a container introspection tool.
 
 ## Recommended Reading
 
