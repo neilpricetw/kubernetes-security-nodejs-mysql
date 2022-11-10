@@ -330,9 +330,9 @@ You may or may not be shocked to hear that auditing is not enabled out of the bo
 - Response status of the actions performed
 
 I've found these links useful in helping to understand and configure Kubernetes auditing:
-- ([kubernetes.io - k8s auditing](https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/#advanced-audit)
+- [kubernetes.io - k8s auditing](https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/#advanced-audit)
 - [signoz.io - k8s auditing](https://signoz.io/blog/kubernetes-audit-logs/)
-- [containiq.com - k8s auditing](https://www.containiq.com/post/kubernetes-audit-logs)).
+- [containiq.com - k8s auditing](https://www.containiq.com/post/kubernetes-audit-logs).
 
 Once auditing is enabled on your cluster then you use the logs to identify who (often a service account) is doing what and when.  There are two types of service accounts in Kubernetes:
 - User Account: allowing humans access to the Kubernetes cluster. Any user needs to get authenticated by the API server to do so usually via a command line tool like kubectl or helm. A user account can be an admin or a developer who is trying to access the cluster level resources.
